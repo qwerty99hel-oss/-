@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Miami Drive 3D</title>
+<style>
+html,body{margin:0;overflow:hidden;background:#9edcf5;font-family:-apple-system,BlinkMacSystemFont,Arial}
+canvas{display:block}
+#hud{position:fixed;top:12px;left:12px;right:12px;color:#fff;text-shadow:0 2px 4px #000;font-weight:700;z-index:5;pointer-events:none}
+#money{font-size:22px}.mission{margin-top:5px;font-size:14px}
+#tip{position:fixed;top:12px;right:12px;background:#0008;color:#fff;padding:8px 10px;border-radius:12px;font-size:12px;z-index:5}
+#controls{position:fixed;left:0;right:0;bottom:0;height:180px;z-index:10;pointer-events:none}
+.joy{position:absolute;left:20px;bottom:20px;width:125px;height:125px;border-radius:50%;background:#ffffff2b;border:2px solid #fff6;pointer-events:auto;touch-action:none}
+.stick{position:absolute;left:37px;top:37px;width:50px;height:50px;border-radius:50%;background:#fff9}
+.buttons{position:absolute;right:18px;bottom:18px;display:grid;grid-template-columns:70px 70px;gap:10px}
+button{width:70px;height:60px;border:0;border-radius:18px;background:#0008;color:#fff;font-size:16px;font-weight:800;touch-action:none}
+#fade{position:fixed;inset:0;background:#000;z-index:20;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px}
+</style>
+</head>
+<body>
+<div id="fade">MIAMI DRIVE 3D<br><small style="font-size:13px">Загрузка города…</small></div>
+<div id="hud"><div id="money">$2,500</div><div class="mission" id="mission">Свободная езда • Найди жёлтый маркер</div></div>
+<div id="tip">Поворот — джойстик<br>GAS / BRAKE — справа</div>
+<div id="controls">
+ <div class="joy" id="joy"><div class="stick" id="stick"></div></div>
+ <div class="buttons">
+  <button id="gas">GAS</button><button id="brake">BRAKE</button>
+  <button id="enter">ENTER</button><button id="job">JOB</button>
+ </div>
+</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9edcf5);
+scene.fog=new THREE.Fog(0x9edcf5,220,1500);
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,1800);
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.8)); renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+
+scene.add(new THREE.HemisphereLight(0xc9eeff,0x6a7750,2.0));
+const sun=new THREE.DirectionalLight(0xfff1c2,2.2);sun.position.set(-300,500,200);sun.castShadow=true;scene.add(sun);
+
+const world=5000;
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(world,world),new THREE.MeshStandardMaterial({color:0x70ad62,roughness:1}));
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+function box(x,y,z,sx,sy,sz,color,rough=.8){
+ const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),new THREE.MeshStandardMaterial({color,roughness:rough}));
+ m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;scene.add(m);return m;
+}
+// ocean + beach
+box(0,-1,2100,5000,2,900,0x2c9ed2);
+box(0,0,1620,5000,1,250,0xe5c17b);
+// roads
+for(let i=-2000;i<=2000;i+=500) box(i,.02,0,130,0.2,5000,0x454545);
+for(let i=-2000;i<=2000;i+=500) box(0,.025,i,5000,.2,130,0x454545);
+
+// buildings
+const colors=[0xf3d3b1,0xe5e0d2,0xb8d7df,0xf0b9a8,0xd0c8ba,0xa8c8c0];
+for(let x=-1900;x<=1900;x+=250){
+ for(let z=-1300;z<=1300;z+=250){
+  if(Math.abs(z-1620)<220) continue;
+  if(Math.abs(x%500)<70 || Math.abs(z%500)<70) continue;
+  const h=35+Math.random()*110;
+  const b=box(x+(Math.random()-.5)*50,h/2,z+(Math.random()-.5)*50,150+Math.random()*55,h,150+Math.random()*55,colors[Math.floor(Math.random()*colors.length)]);
+  // rooftop
+  if(Math.random()>.35) box(b.position.x,h+2,b.position.z,b.geometry.parameters.width*.5,4,b.geometry.parameters.depth*.5,0x777777);
+ }
+}
+// palms
+function palm(x,z){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ const trunk=new THREE.Mesh(new THREE.CylinderGeometry(5,8,65,8),new THREE.MeshStandardMaterial({color:0x8a5a32}));trunk.position.y=32;trunk.castShadow=true;g.add(trunk);
+ for(let i=0;i<8;i++){const leaf=new THREE.Mesh(new THREE.BoxGeometry(5,2,65),new THREE.MeshStandardMaterial({color:0x2d8c45}));leaf.position.y=66;leaf.rotation.y=i*Math.PI/4;leaf.rotation.z=-.3;g.add(leaf)}
+}
+for(let x=-2300;x<=2300;x+=150) palm(x,1480+Math.sin(x)*25);
+
+// car
+const car=new THREE.Group();scene.add(car);car.position.set(0,1,0);
+const body=box(0,12,0,72,20,125,0xd52f3e,.35);body.parent=car;body.position.set(0,12,0);
+const cabin=box(0,28,-2,55,22,62,0x24384b,.15);cabin.parent=car;cabin.position.set(0,28,-2);
+const hood=box(0,22,43,62,8,35,0xe43b45,.3);hood.parent=car;hood.position.set(0,22,43);
+for(const sx of [-34,34])for(const sz of [-38,38]){
+ const w=new THREE.Mesh(new THREE.CylinderGeometry(13,13,8,20),new THREE.MeshStandardMaterial({color:0x151515,roughness:.7}));
+ w.rotation.z=Math.PI/2;w.position.set(sx,10,sz);w.parent=car;w.castShadow=true;
+}
+car.traverse(o=>{if(o.isMesh)o.castShadow=true});
+
+// NPCs
+const npcs=[];
+for(let i=0;i<45;i++){
+ const g=new THREE.Group();g.position.set((Math.random()*4200-2100),0,(Math.random()*3000-1300));
+ const shirt=new THREE.Mesh(new THREE.CapsuleGeometry(6,15,4,8),new THREE.MeshStandardMaterial({color:new THREE.Color().setHSL(Math.random(),.6,.55)}));shirt.position.y=13;g.add(shirt);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(6,12,10),new THREE.MeshStandardMaterial({color:0xe6b58b}));head.position.y=29;g.add(head);
+ g.userData={a:Math.random()*6.28,s:.4+Math.random()*.5};scene.add(g);npcs.push(g);
+}
+// mission marker
+const marker=new THREE.Mesh(new THREE.TorusGeometry(30,5,12,32),new THREE.MeshBasicMaterial({color:0xffd21f}));
+marker.rotation.x=Math.PI/2;marker.position.set(650,2,-650);scene.add(marker);
+
+let speed=0, steer=0, money=2500, mission=0, wanted=0, active=true;
+const joy=document.getElementById('joy'),stick=document.getElementById('stick'),gas=document.getElementById('gas'),brake=document.getElementById('brake');
+let joyX=0,gasOn=false,brakeOn=false;
+function setJoy(e){const r=joy.getBoundingClientRect(),x=e.clientX-r.left-r.width/2,y=e.clientY-r.top-r.height/2;const d=Math.min(Math.hypot(x,y),48),a=Math.atan2(y,x);joyX=Math.max(-1,Math.min(1,x/48));stick.style.transform=`translate(${Math.cos(a)*d}px,${Math.sin(a)*d}px)`}
+joy.onpointerdown=e=>{joy.setPointerCapture(e.pointerId);setJoy(e)};joy.onpointermove=e=>{if(e.buttons)setJoy(e)};joy.onpointerup=()=>{joyX=0;stick.style.transform='translate(0,0)'};
+gas.onpointerdown=()=>gasOn=true;gas.onpointerup=()=>gasOn=false;gas.onpointercancel=()=>gasOn=false;
+brake.onpointerdown=()=>brakeOn=true;brake.onpointerup=()=>brakeOn=false;brake.onpointercancel=()=>brakeOn=false;
+document.getElementById('enter').onclick=()=>{ if(mission===0){mission=1;document.getElementById('mission').textContent='Миссия: доедь до дома 🏠'}}; 
+document.getElementById('job').onclick=()=>{if(mission===0){mission=1;document.getElementById('mission').textContent='Миссия: доедь до дома 🏠'}};
+const keys={};addEventListener('keydown',e=>keys[e.key.toLowerCase()]=1);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=0);
+
+const clock=new THREE.Clock();
+function animate(){
+ requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04);
+ const gasInput=gasOn||keys.w||keys.arrowup, brakeInput=brakeOn||keys.s||keys.arrowdown;
+ if(gasInput)speed=Math.min(speed+55*dt,95);else speed*=Math.pow(.08,dt);
+ if(brakeInput)speed*=Math.pow(.003,dt);
+ steer=joyX||((keys.a||keys.arrowleft)?-1:0)+((keys.d||keys.arrowright)?1:0);
+ car.rotation.y-=steer*speed*.0009;
+ car.translateZ(-speed*dt);
+ // keep city bounds
+ car.position.x=Math.max(-2350,Math.min(2350,car.position.x));car.position.z=Math.max(-1750,Math.min(2100,car.position.z));
+ marker.rotation.z+=dt*2;
+ npcs.forEach(n=>{n.position.x+=Math.cos(n.userData.a)*n.userData.s; n.position.z+=Math.sin(n.userData.a)*n.userData.s;if(Math.abs(n.position.x)>2400||Math.abs(n.position.z)>1700)n.userData.a+=Math.PI});
+ const target=new THREE.Vector3(car.position.x,35,car.position.z+150);target.applyAxisAngle(new THREE.Vector3(0,1,0),car.rotation.y);
+ camera.position.lerp(target,.10);camera.lookAt(car.position.x,8,car.position.z-80);
+ if(mission===1&&car.position.distanceTo(marker.position)<100){mission=2;money+=1000;document.getElementById('mission').textContent='任务完成！ +$1,000 • 自由探索城市';marker.visible=false}
+ document.getElementById('money').textContent='$'+money.toLocaleString();
+ renderer.render(scene,camera);
+}
+animate();
+setTimeout(()=>document.getElementById('fade').style.display='none',900);
+</script></body></html>
